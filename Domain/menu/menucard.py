@@ -103,25 +103,51 @@ class MenuManager:
                 return
 
             new_id = max([item['id'] for cat in menu.values() for item in cat], default=0) + 1
-            name = input("Enter item name: ")
+            name = input("Enter item name: ").strip()
 
-            if category == "drinks":
-                price = int(input("Enter price: "))
-                new_item = {"id": new_id, "name": name, "price": price}
+            if not name:
+                print("Item name cannot be empty.")
+                return
+
+            print("\nSelect price type for this item:")
+            print("1 - Half & Full price")
+            print("2 - Single price")
+            price_type = input("Enter your choice (1/2): ").strip()
+
+            if price_type == "1":
+                half_price = input("Enter half price: ").strip()
+                full_price = input("Enter full price: ").strip()
+
+                if not half_price or not full_price:
+                    print("Both half and full price are required for this type.")
+                    return
+
+                new_item = {
+                    "id": new_id,
+                    "name": name,
+                    "half_price": int(half_price),
+                    "full_price": int(full_price)
+                }
+
+            elif price_type == "2":
+                price = input("Enter single price: ").strip()
+                if not price:
+                    print("Price cannot be empty.")
+                    return
+
+                new_item = {
+                    "id": new_id,
+                    "name": name,
+                    "price": int(price)
+                }
+
             else:
-                half_price = input("Enter half price (leave blank if not applicable): ")
-                full_price = input("Enter full price (leave blank if not applicable): ")
-
-                if half_price and full_price:
-                    new_item = {"id": new_id, "name": name,
-                                "half_price": int(half_price), "full_price": int(full_price)}
-                else:
-                    price = int(input("Enter single price: "))
-                    new_item = {"id": new_id, "name": name, "price": price}
+                print("Invalid choice. Item not added.")
+                return
 
             menu[category].append(new_item)
             self.saveMenu(menu)
-            print(f"{name} added successfully to {category} menu!")
+            print(f"\n{name} added successfully to {category} menu!")
 
         except Exception as e:
             error_logs(e)

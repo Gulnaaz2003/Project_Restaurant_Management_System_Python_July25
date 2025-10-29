@@ -3,6 +3,7 @@ import os
 from Domain.menu.menucard import MenuManager
 from Domain.Bill.generatingbill import generatingBill
 from Domain.Table.bookingtable import tableBookingMenu
+from Report.revenue import monthlyReport
 from datetime import datetime
 from Logs.log import error_logs
 
@@ -34,9 +35,13 @@ class OrderManager:
                 print("Menu is empty. Ask admin to add items.")
                 return
 
-            customerName = input("Enter customer name: ")
+            customerName = input("Enter customer name: ").strip()
+            if not customerName:
+                print("Customer name cannot be empty.")
+                return
+
             orderItems = []
-            total = 0
+            total = 0.0
 
             menu_mgr.displayMenu()
 
@@ -45,47 +50,66 @@ class OrderManager:
                 if itemName == "done":
                     break
 
-                all_items = [item for items in menu.values() for item in items]
+                all_items = []
+                for category, items in menu.items():
+                    for item in items:
+                        if "name" in item:
+                            all_items.append(item)
+
                 matched_item = next((i for i in all_items if i["name"].lower() == itemName), None)
 
-                if matched_item:
-                    try:
-                        if "half_price" in matched_item and "full_price" in matched_item:
-                            portion = input("Do you want Half or Full? (h/f): ").strip().lower()
-                            if portion == "h":
-                                selected_price = matched_item["half_price"]
-                                portion_name = "Half"
-                            elif portion == "f":
-                                selected_price = matched_item["full_price"]
-                                portion_name = "Full"
-                            else:
-                                print("Invalid choice, skipping item.")
-                                continue
+                if not matched_item:
+                    print("Item not found in menu.")
+                    continue
+
+                try:
+                    if "half_price" in matched_item and "full_price" in matched_item:
+                        portion = input("Do you want Half or Full? (h/f): ").strip().lower()
+                        if portion == "h":
+                            selected_price = float(matched_item["half_price"])
+                            portion_name = "Half"
+                        elif portion == "f":
+                            selected_price = float(matched_item["full_price"])
+                            portion_name = "Full"
                         else:
-                            selected_price = matched_item.get("price", 0)
-                            portion_name = "Single"
-
-                        qty = float(input(f"Enter quantity for {matched_item['name']} ({portion_name}): "))
-                        if qty <= 0 or qty > 50:
-                            print("Quantity must be between 1 and 50.")
+                            print("Invalid choice, skipping item.")
                             continue
+                    else:
+                        selected_price = matched_item.get("price")
+                        if selected_price is None:
+                            print("This item has no valid price entry. Skipping.")
+                            continue
+                        selected_price = float(selected_price)
+                        portion_name = "Single"
 
-                        item_total = selected_price * qty
-                        total += item_total
-                        orderItems.append({
-                            "itemId": matched_item["id"],
-                            "name": matched_item["name"],
-                            "portion": portion_name,
-                            "price": selected_price,
-                            "quantity": qty
-                        })
-                    except ValueError:
-                        print("Invalid quantity input.")
-                else:
-                    print("Item not found.")
+                    quantity_str = input(f"Enter quantity for {matched_item['name']} ({portion_name}): ").strip()
+                    if not quantity_str.isdigit():
+                        print("Quantity must be a number.")
+                        continue
+
+                    qty = int(quantity_str)
+                    if qty <= 0 or qty > 50:
+                        print("Quantity must be between 1 and 50.")
+                        continue
+
+                    item_total = selected_price * qty
+                    total += item_total
+
+                    orderItems.append({
+                        "itemId": matched_item["id"],
+                        "name": matched_item["name"],
+                        "portion": portion_name,
+                        "price": selected_price,
+                        "quantity": qty
+                    })
+
+                    print(f"Added {matched_item['name']} ({portion_name}) x {qty} = ₹{item_total}")
+
+                except Exception as e:
+                    print(f"Error adding item: {e}")
 
             if not orderItems:
-                print("No items selected.")
+                print("No items selected. Order Cancelled.")
                 return
 
             use_custom = input("Enter custom date/time? (y/n): ").strip().lower()
@@ -98,7 +122,7 @@ class OrderManager:
                     order_datetime = datetime.now()
             else:
                 order_datetime = datetime.now()
-
+                
             all_orders = self.loadOrder()
             orderId = len(all_orders) + 1
 
@@ -140,7 +164,8 @@ class OrderManager:
             print("2 - View all orders")
             print("3 - Generate bill")
             print("4 - Table booking")
-            print("5 - Exit")
+            print("5 - Monthly Sales Report")
+            print("6 - Exit")
 
             try:
                 choice = int(input("Enter your choice: "))
@@ -153,6 +178,8 @@ class OrderManager:
                 elif choice == 4:
                     tableBookingMenu()
                 elif choice == 5:
+                    monthlyReport()
+                elif choice == 6:
                     break
                 else:
                     print("Invalid choice, try again.")

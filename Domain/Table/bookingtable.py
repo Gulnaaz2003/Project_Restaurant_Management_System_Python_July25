@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 bookingFile = "Database/booking.json"
 
 TIME_SLOTS = ["12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"]
+MAX_SEATS_PER_TABLE = 6
 
 def loadBooking():
     if not os.path.exists(bookingFile):
@@ -47,6 +48,18 @@ def bookTable():
     allTables = list(range(1, 11)) 
 
     bookingDate = input("Enter booking date (YYYY-MM-DD): ").strip()
+
+    try:
+        booking_dt = datetime.strptime(bookingDate, "%Y-%m-%d").date()
+        today = datetime.now().date()
+        if booking_dt < today:
+            print(" You cannot book a past date! ")
+            return
+        
+    except ValueError:
+        print("Invalid date format. Use YYYY-MM-DD. ")
+        return
+
     print("Available time slots:", TIME_SLOTS)
     timeSlot = input("Enter start time (HH:MM): ").strip()
 
@@ -64,31 +77,54 @@ def bookTable():
         return
 
     availableTables = []
+    tableSeatsStatus = {}
+
     for table in allTables:
+        totalSeatsBooked = 0
         conflict = False
+
         for b in bookings:
             if b["bookingDate"] == bookingDate and b["tableNo"] == table:
                 if isTimeOverlap(timeSlot, duration, b["timeSlot"], b.get("duration", 1)):
-                    conflict = True
-                    break
+                    totalSeatsBooked += b.get("seats", 0)
+                    if totalSeatsBooked >= MAX_SEATS_PER_TABLE:
+                        conflict = True
+                        break
+
         if not conflict:
-            availableTables.append(table)
+            remainingSeats = MAX_SEATS_PER_TABLE - totalSeatsBooked
+            if remainingSeats > 0:
+                availableTables.append(table)
+                tableSeatsStatus[table] = remainingSeats
 
     if not availableTables:
         print("No tables available for the selected time and duration.")
         return
 
-    print("Available tables:", availableTables)
+    print("Available tables (with reamaining seats): ")
+    for t in availableTables:
+        print(f"Table {t} -> {tableSeatsStatus[t]} seats left ")
+
     customerName = input("Enter customer name: ").strip()
+    if not customerName:
+        print("Customer name cannot be empty. ")
+        return
 
     try:
         tableNo = int(input("Enter table number to book: "))
+        if tableNo not in availableTables:
+            print("Table already booked or invalid.")
+            return
     except ValueError:
         print("Invalid table number.")
         return
-
-    if tableNo not in availableTables:
-        print("Table already booked or invalid.")
+ 
+    try:
+        seats = int(input("Enter number of seats to book: "))
+        if seats <= 0 or seats > tableSeatsStatus[tableNo]:
+            print(f"Only {tableSeatsStatus[tableNo]} seats are available on this table. ")
+    except ValueError:
+        print("Invalid seat number. ")
         return
 
     dateTime = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -96,6 +132,7 @@ def bookTable():
     bookings.append({
         "tableNo": tableNo,
         "customerName": customerName,
+        "seats" : seats,
         "timeSlot": timeSlot,
         "duration": duration,
         "bookingDate": bookingDate,
